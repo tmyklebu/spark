@@ -275,6 +275,18 @@ class ALS private (
   }
 
   /**
+   * Wrap an array with a DoubleMatrix without creating garbage.
+   */
+  private def wrapDoubleArray(v: Array[Double]): DoubleMatrix = {
+    val ans: DoubleMatrix = new DoubleMatrix()
+    ans.rows = v.length
+    ans.columns = 1
+    ans.length = v.length
+    ans.data = v
+    ans
+  }
+
+  /**
    * Computes the (`rank x rank`) matrix `YtY`, where `Y` is the (`nui x rank`) matrix of factors
    * for each user (or product), in a distributed fashion.
    *
@@ -284,7 +296,7 @@ class ALS private (
   private def computeYtY(factors: RDD[(Int, Array[Array[Double]])]) = {
     val n = rank * (rank + 1) / 2
     val LYtY = factors.values.aggregate(new DoubleMatrix(n))( seqOp = (L, Y) => {
-      Y.foreach(y => dspr(1.0, new DoubleMatrix(y), L))
+      Y.foreach(y => dspr(1.0, wrapDoubleArray(y), L))
       L
     }, combOp = (L1, L2) => {
       L1.addi(L2)
@@ -472,7 +484,7 @@ class ALS private (
     // block
     for (productBlock <- 0 until numBlocks) {
       for (p <- 0 until blockFactors(productBlock).length) {
-        val x = new DoubleMatrix(blockFactors(productBlock)(p))
+        val x = wrapDoubleArray(blockFactors(productBlock)(p))
         tempXtX.fill(0.0)
         dspr(1.0, x, tempXtX)
         val (us, rs) = inLinkBlock.ratingsForBlock(productBlock)(p)
